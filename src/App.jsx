@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, memo } from "react";
+import SKETCH from "./assets/sketch.png";
 
 // ── Configuration ──────────────────────────────────────────────
 const ROWS = 9;
@@ -17,29 +18,6 @@ const STAGGER = 15;           // ms of reveal delay per cell of distance from fo
 const REVEAL_MS = 340;        // per-cell brighten duration
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-
-// Placeholder "sketch". Aspect 780x270 (= 26:9) → square cells.
-const PLACEHOLDER = `data:image/svg+xml;utf8,${encodeURIComponent(
-  `<svg xmlns='http://www.w3.org/2000/svg' width='780' height='270' viewBox='0 0 780 270'>
-    <defs>
-      <linearGradient id='sky' x1='0' y1='0' x2='0' y2='1'>
-        <stop offset='0' stop-color='#2b3a67'/><stop offset='1' stop-color='#f6b26b'/>
-      </linearGradient>
-    </defs>
-    <rect width='780' height='270' fill='url(#sky)'/>
-    <circle cx='610' cy='72' r='44' fill='#ffe08a'/>
-    <circle cx='170' cy='60' r='10' fill='#fff' opacity='.8'/>
-    <circle cx='210' cy='48' r='7' fill='#fff' opacity='.7'/>
-    <path d='M0 200 Q 195 130 390 190 T 780 175 V270 H0 Z' fill='#3d6b4f'/>
-    <path d='M0 236 Q 260 190 520 232 T 780 220 V270 H0 Z' fill='#274d38'/>
-    <rect x='120' y='150' width='42' height='62' fill='#8b5e3c'/>
-    <polygon points='114,150 141,118 168,150' fill='#a33b3b'/>
-    <rect x='470' y='158' width='34' height='52' fill='#6d4a30'/>
-    <polygon points='464,158 487,132 510,158' fill='#c76b4a'/>
-    <circle cx='320' cy='150' r='16' fill='#2f5d43'/><rect x='317' y='150' width='6' height='30' fill='#5a3a22'/>
-    <circle cx='690' cy='168' r='20' fill='#2f5d43'/><rect x='686' y='168' width='8' height='34' fill='#5a3a22'/>
-  </svg>`
-)}`;
 
 // ── Dimming / reveal overlay (memoised so pinch-zoom never re-renders 234 tiles) ──
 const TileOverlay = memo(function TileOverlay({ overview, collapse, scrubbing, focusRow, focusCol, cw, ch }) {
@@ -83,14 +61,14 @@ export default function App() {
   const [pinching, setPinching] = useState(false);
   const [focus, setFocus] = useState({ row: 4, col: 12 });
   const [live, setLive] = useState({ row: 4, col: 12 });
-  const [src] = useState(PLACEHOLDER);
-  const [aspect, setAspect] = useState(780 / 270);
+  const [src] = useState(SKETCH);
+  const [aspect, setAspect] = useState(4605 / 1593);
 
   // Load the fixed sketch once and pick up its real aspect ratio.
   useEffect(() => {
     const img = new Image();
     img.onload = () => setAspect(img.width / img.height);
-    img.src = PLACEHOLDER;
+    img.src = SKETCH;
   }, []);
 
   const pointers = useRef(new Map()); // id -> {x,y}
@@ -290,22 +268,24 @@ export default function App() {
   const ready = offset && baseCellW;
   const onCellW = baseCellW * zoom, onCellH = baseCellH * zoom;
 
+  window.__dbg = () => ({ zoom, offset, panning, pinching, overview, focus, revealZoom, zoomMin, fitAll, gestureType: gesture.current?.type, pointerCount: pointers.current.size });
+  window.__handlers = { onPointerDown, onPointerMove, handleUp };
+
   return (
     <div dir="rtl" className="w-full h-screen bg-slate-950 text-slate-100 flex flex-col select-none"
          style={{ fontFamily: "system-ui, 'Segoe UI', sans-serif" }}>
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-white/10">
-        <div className="flex flex-col">
-          <span className="text-xl font-black italic tracking-tight bg-gradient-to-l from-amber-300 via-orange-400 to-fuchsia-500 bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(251,146,60,0.35)]">
-            רולר 3000<sup className="not-italic text-[0.5em] align-super mr-0.5 text-amber-300/80">TM</sup>
-          </span>
-        </div>
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-3 border-b border-white/10">
         <div className="flex items-center gap-2">
           <button onClick={overview ? focusOne : showAll}
-                  className="text-xs px-3 py-2 rounded-lg bg-amber-400/90 text-slate-950 font-semibold hover:bg-amber-300 transition-colors">
+                  className="text-xs px-3 py-2 rounded-lg bg-sky-400/90 text-slate-950 font-semibold hover:bg-sky-300 transition-colors">
             {overview ? "חזרה למשבצת" : "כל הסקיצה"}
           </button>
         </div>
+        <span className="text-xl font-black italic tracking-tight bg-gradient-to-l from-sky-300 via-blue-400 to-indigo-500 bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(56,189,248,0.35)]">
+          ROLLER 3000<sup className="not-italic text-[0.5em] align-super mr-0.5 text-sky-300/80">TM</sup>
+        </span>
+        <div />
       </div>
 
       {/* Viewport */}
@@ -337,10 +317,10 @@ export default function App() {
               <div className="absolute left-1/2 top-1/2 pointer-events-none"
                    style={{
                      width: onCellW, height: onCellH, transform: "translate(-50%, -50%)",
-                     outline: "2px solid rgba(251,191,36,.95)", outlineOffset: "-1px", borderRadius: 2,
+                     outline: "2px solid rgba(56,189,248,.95)", outlineOffset: "-1px", borderRadius: 2,
                      boxShadow: "0 0 0 1px rgba(0,0,0,.4)",
                    }}>
-                <div className="absolute top-1 right-1 px-2 py-0.5 rounded-md bg-amber-400 text-slate-950 text-[11px] font-bold tabular-nums shadow">
+                <div className="absolute top-1 right-1 px-2 py-0.5 rounded-md bg-sky-400 text-slate-950 text-[11px] font-bold tabular-nums shadow">
                   {focus.row + 1}·{focus.col + 1}
                 </div>
               </div>
@@ -349,7 +329,7 @@ export default function App() {
             {/* Live chip while scrubbing with one finger */}
             {panning && !pinching && !overview && (
               <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
-                <div className="px-3 py-1.5 rounded-lg bg-amber-400 text-slate-950 text-sm font-bold tabular-nums shadow-lg">
+                <div className="px-3 py-1.5 rounded-lg bg-sky-400 text-slate-950 text-sm font-bold tabular-nums shadow-lg">
                   שורה {live.row + 1} · עמודה {live.col + 1}
                 </div>
               </div>
