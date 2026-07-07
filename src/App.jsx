@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState, memo } from "react";
 import SKETCH from "./assets/sketch.png";
+import { PALETTE } from "./palette";
+import { useSketchAnalysis } from "./useSketchAnalysis";
+import { PaletteStrip, RecipeCard } from "./ColorMap";
 
 // ── Configuration ──────────────────────────────────────────────
 const ROWS = 9;
@@ -63,6 +66,10 @@ export default function App() {
   const [live, setLive] = useState({ row: 4, col: 12 });
   const [src] = useState(SKETCH);
   const [aspect, setAspect] = useState(4605 / 1593);
+  const [activeColor, setActiveColor] = useState(null); // manually selected palette id
+
+  // Colour analysis: per-cell dominant colour + per-colour affinity heatmaps.
+  const { ready: analysisReady, cellColor, heatmapURL } = useSketchAnalysis(SKETCH);
 
   // Load the fixed sketch once and pick up its real aspect ratio.
   useEffect(() => {
@@ -268,6 +275,14 @@ export default function App() {
   const ready = offset && baseCellW;
   const onCellW = baseCellW * zoom, onCellH = baseCellH * zoom;
 
+  // Dominant palette colour of the focused cell (focus mode only).
+  const focusCell = (analysisReady && !overview) ? cellColor(focus.row, focus.col) : null;
+  // Which swatch reads as "active": the manual pick, else the focused cell's colour.
+  const stripActiveId = activeColor ?? (focusCell && !focusCell.inBetween ? focusCell.nearest.id : null);
+  // Heatmap image for the selected colour.
+  const heatUrl = (analysisReady && activeColor) ? heatmapURL(activeColor) : null;
+  const activeColorObj = activeColor ? PALETTE.find((c) => c.id === activeColor) : null;
+
   window.__dbg = () => ({ zoom, offset, panning, pinching, overview, focus, revealZoom, zoomMin, fitAll, gestureType: gesture.current?.type, pointerCount: pointers.current.size });
   window.__handlers = { onPointerDown, onPointerMove, handleUp };
 
@@ -285,7 +300,9 @@ export default function App() {
         <span className="text-xl font-black italic tracking-tight bg-gradient-to-l from-sky-300 via-blue-400 to-indigo-500 bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(56,189,248,0.35)]">
           ROLLER 3000<sup className="not-italic text-[0.5em] align-super mr-0.5 text-sky-300/80">TM</sup>
         </span>
-        <div />
+        <div className="flex justify-end">
+          <PaletteStrip palette={PALETTE} activeId={stripActiveId} onSelect={setActiveColor} />
+        </div>
       </div>
 
       {/* Viewport */}
@@ -303,6 +320,11 @@ export default function App() {
                    transition: snapTransition,
                  }}>
               <img src={src} alt="" draggable={false} className="absolute inset-0 w-full h-full" />
+              {heatUrl && (
+                <img src={heatUrl} alt="" draggable={false}
+                     className="absolute inset-0 w-full h-full pointer-events-none"
+                     style={{ opacity: overview ? 1 : 0.5 }} />
+              )}
               <div className="absolute inset-0" style={{
                 backgroundImage:
                   `repeating-linear-gradient(to right, rgba(255,255,255,.32) 0 1px, transparent 1px ${baseCellW}px),
@@ -338,14 +360,40 @@ export default function App() {
         )}
       </div>
 
-      {/* Footer status */}
-      <div className="px-4 py-2 border-t border-white/10 text-center text-xs text-slate-400 tabular-nums">
+      {/* Footer status + recipe */}
+      <div className="px-4 py-2 border-t border-white/10 text-center text-xs text-slate-400 min-h-[52px] flex flex-col items-center justify-center gap-1">
         {overview ? (
-          "סקיצה מלאה"
+          activeColorObj ? (
+            <>
+              <RecipeCard color={activeColorObj} />
+              <span className="text-[10px] text-slate-500">מפת חום · היכן הצבע מופיע בסקיצה</span>
+            </>
+          ) : (
+            <span className="tabular-nums">סקיצה מלאה · בחרו צבע מהפלטה למפת חום</span>
+          )
         ) : (
           <>
-            <div>שורה {focus.row + 1}/{ROWS} · עמודה {focus.col + 1}/{COLS}</div>
-            <div className="text-[10px] text-slate-500 mt-0.5">משבצת נבחרת</div>
+            <div className="tabular-nums">שורה {focus.row + 1}/{ROWS} · עמודה {focus.col + 1}/{COLS}</div>
+            {activeColorObj ? (
+              <RecipeCard color={activeColorObj} />
+            ) : focusCell ? (
+              focusCell.inBetween ? (
+                <div className="flex items-center gap-2 flex-wrap justify-center">
+                  <span className="text-[11px] text-amber-300/90">צבע ביניים — לערבב לפי הצורך</span>
+                  <span className="text-[10px] text-slate-500">בין</span>
+                  {[focusCell.nearest, focusCell.second].map((c) => (
+                    <span key={c.id} className="inline-flex items-center gap-1">
+                      <span className="rounded ring-1 ring-white/25" style={{ width: 16, height: 16, background: `#${c.hex}` }} />
+                      <span className="text-[10px] tabular-nums">צבע {c.id}</span>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <RecipeCard color={focusCell.nearest} />
+              )
+            ) : (
+              <div className="text-[10px] text-slate-500">משבצת נבחרת</div>
+            )}
           </>
         )}
       </div>
